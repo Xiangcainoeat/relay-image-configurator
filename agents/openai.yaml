@@ -1,4 +1,4 @@
 interface:
   display_name: "中转站 Image 图像生成配置器"
-  short_description: "先引导配置终端 API Key 和 URL，再验证并调用中转图片生成工具"
+  short_description: "仅在本次确认走中转时生图；先配 API Key 和 URL，默认 PNG"
   default_prompt: "使用 $relay-image-configurator 引导我在终端安全配置 API Key 和 URL，检查通过后再询问是否生成测试图。"

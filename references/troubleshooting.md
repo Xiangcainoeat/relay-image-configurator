@@ -31,3 +31,7 @@ POST {BASE_URL}/responses
 ## 向运营方提供什么
 
 提供脱敏错误、请求时间、请求的模型名、request_id / response_id、实际尺寸/质量差异。JSON 包含提示词，应先人工确认是否适合分享。**不提供 Key、完整环境变量、认证头或私人输入文件。**
+
+## 配过 Key，切回官方还走中转？
+
+Key / URL 不表示当前线路。官方模式不应调用本工具；未知线路先确认。`Relay route is not confirmed` 是本地保护，不是 API 报错，不能盲目加 `--confirm-relay`。需要明确选择中转后才添加本次确认参数。localhost 代理地址不能暴露代理背后的实时账号，当前不支持无感切换集成。检查是否有旧 skill 使用“每次生图都走中转”的宽泛规则；本 skill 不会自行修改它们。

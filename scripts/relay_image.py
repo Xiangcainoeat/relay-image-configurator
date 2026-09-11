@@ -179,6 +179,11 @@ def extract_image(item):
 
 
 def generate(args, key, base):
+    # A per-call acknowledgment, NOT an account detector or a persistent mode.
+    if not args.confirm_relay:
+        raise RelayError('Relay route is not confirmed for this request. Stop on official/unknown routes; '
+                         'use --confirm-relay only after the user explicitly chooses this relay or '
+                         'the current session route is reliably confirmed. Stored Key/URL are not proof.')
     payload = build_payload(args)
     if args.dry_run:
         print(json.dumps({'endpoint': '/responses', 'request': scrub(payload, key),
@@ -203,7 +208,8 @@ def generate(args, key, base):
               'image_model_requested': payload['tools'][0]['model'],
               'size_requested': args.size, 'quality_requested': args.quality,
               'prompt': payload['input'][0]['content'][0]['text'],
-              'status': 'failed', 'images': [], 'max_retries': 0, 'warnings': []}
+              'status': 'failed', 'images': [], 'max_retries': 0, 'warnings': [],
+              'route_confirmation': 'per-request-cli-acknowledgment', 'output_format_requested': 'png'}
     started = time.monotonic()
     candidates = {}
     failure = None
@@ -281,6 +287,8 @@ def parser():
     prompt.add_argument('--prompt')
     prompt.add_argument('--prompt-file')
     gen.add_argument('--out', required=True)
+    gen.add_argument('--confirm-relay', action='store_true',
+                     help='Acknowledge this request is intended for the configured relay; NOT account detection')
     gen.add_argument('--driver-model')
     gen.add_argument('--image-model')
     gen.add_argument('--size', default='1024x1024')

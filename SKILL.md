@@ -1,11 +1,21 @@
 ---
 name: relay-image-configurator
-description: Configure a user's trusted OpenAI-compatible image relay in terminal environment variables, validate the setup, and generate PNG images through its Responses image_generation tool. Use when the user asks to set up a relay API key/URL, configure relay image generation, or generate an image through this configured relay. Not for unrelated model routing, vector assets, or editing existing images.
+description: Configure a trusted image relay's terminal API Key and URL. For image generation, use only when the user explicitly chooses this relay or reliable current-session evidence confirms this configured relay is active. Do not take over ordinary image requests on official accounts or unknown routes; saved credentials alone are not a trigger. Generates a single PNG, not image edits or vector assets.
 ---
 
 # 中转站 Image 图像生成配置器
 
 帮助用户先在终端配置自己的 API Key 和 URL，然后通过中转站 `/responses` 调用图片生成工具。独立运行，不依赖系统 imagegen skill、CC Switch 或作者的账号。
+
+## 触发与线路判断（先于环境检查）
+
+- 用户要求配置/排查中转时，可以引导配置；这不授权生图。
+- 用户本次明确选择这个中转生图，或当前会话有可靠证据确认正在使用这个已配置中转时，才接管生图。
+- 当前明确使用官方账号且用户没有选择中转时，不接管、不运行本脚本，交回官方可用的生图流程。不要声称官方生图一定可用。
+- 普通生图请求的线路未知时，不默认走中转；必要时只问一句“这次走中转还是官方？”。用户切换账号/线路后，旧确认失效。
+- 环境变量存在、过去成功、模型名称、磁盘 config.toml 中的自定义 provider，以及 localhost 代理地址，都不能单独证明当前会话在用这个中转。代理可能在不改地址的情况下切换上游。不要扫描凭据或声称本工具能自动识别账号切换。
+- 确认上述条件后，才给本次 CLI 调用传 `--confirm-relay`。这是调用方的逐次确认，不是程序自动检测；禁止为绕过报错而盲目补参数。不要持久化这个确认。
+- Skill 的描述是语义选择规则，不是账号事件钩子；即使被加载，也必须先执行此分流检查。
 
 ## 先配置，后使用
 
@@ -28,7 +38,7 @@ description: Configure a user's trusted OpenAI-compatible image relay in termina
 用户已经要求生成图片，且当前执行环境校验通过后，使用本 skill 自带脚本。保留用户的主体、风格和模型选择；不要为排错自动改提示词或换模型。
 
 ```bash
-python3 "$SKILL_DIR/scripts/relay_image.py" generate \
+python3 "$SKILL_DIR/scripts/relay_image.py" generate --confirm-relay \
   --prompt "一只毛茸茸的小橘猫，完整坐姿，写实宠物摄影，柔和自然光，无文字或水印" \
   --driver-model gpt-5.5 \
   --image-model gpt-image-2 \

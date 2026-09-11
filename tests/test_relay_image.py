@@ -82,7 +82,7 @@ class ConfigurationTests(unittest.TestCase):
 
     def test_missing_env_prevents_generate_network(self):
         with patch.dict(os.environ, {}, clear=True), patch.object(relay, 'call') as call, contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(relay.main(['generate', '--prompt', 'cat', '--out', '/unused.png']), 1)
+            self.assertEqual(relay.main(['generate', '--confirm-relay', '--prompt', 'cat', '--out', '/unused.png']), 1)
         call.assert_not_called()
 
     def test_redacts_nested_key_and_bearer(self):
@@ -92,6 +92,30 @@ class ConfigurationTests(unittest.TestCase):
 
     def test_redirect_is_not_followed(self):
         self.assertIsNone(relay.NoRedirect().redirect_request(None, None, 302, 'redirect', {}, 'https://elsewhere.example'))
+
+
+class RoutingTests(unittest.TestCase):
+    def test_saved_credentials_do_not_authorize_relay_generation(self):
+        env = dict(ENV, RELAY_IMAGE_CONFIRM_RELAY='true', RELAY_IMAGE_MODE='relay')
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / 'blocked.png'
+            with patch.dict(os.environ, env, clear=True), patch.object(relay, 'call') as call, \
+                    contextlib.redirect_stderr(io.StringIO()) as error:
+                status = relay.main(['generate', '--prompt', 'cat', '--out', str(out)])
+            self.assertEqual(status, 1)
+            self.assertIn('not confirmed', error.getvalue())
+            call.assert_not_called()
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_dry_run_also_requires_per_request_confirmation(self):
+        with patch.dict(os.environ, ENV, clear=True), patch.object(relay, 'call') as call, \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(relay.main(['generate', '--prompt', 'cat', '--out', '/unused.png', '--dry-run']), 1)
+        call.assert_not_called()
+
+    def test_png_is_default_request_format(self):
+        args = relay.parser().parse_args(['generate', '--confirm-relay', '--prompt', 'cat', '--out', 'cat.png'])
+        self.assertEqual(relay.build_payload(args, ENV)['tools'][0]['output_format'], 'png')
 
 
 class TransportTests(unittest.TestCase):
@@ -184,7 +208,7 @@ class GenerateTests(unittest.TestCase):
         with patch.dict(os.environ, ENV, clear=True), \
                 patch.object(relay, 'call', return_value=Response(events, content_type)) as call, \
                 contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            status = relay.main(['generate', '--prompt', 'cat', '--out', str(self.out)] + list(extra))
+            status = relay.main(['generate', '--confirm-relay', '--prompt', 'cat', '--out', str(self.out)] + list(extra))
         return status, call, stdout.getvalue() + stderr.getvalue()
 
     def report(self):
@@ -212,7 +236,7 @@ class GenerateTests(unittest.TestCase):
         self.assertEqual(payload['tools'][0]['model'], 'custom-image')
 
     def test_environment_model_default(self):
-        args = relay.parser().parse_args(['generate', '--prompt', 'cat', '--out', 'a.png'])
+        args = relay.parser().parse_args(['generate', '--confirm-relay', '--prompt', 'cat', '--out', 'a.png'])
         payload = relay.build_payload(args, {'RELAY_IMAGE_DRIVER_MODEL': 'driver-env', 'RELAY_IMAGE_MODEL': 'image-env'})
         self.assertEqual(payload['model'], 'driver-env')
         self.assertEqual(payload['tools'][0]['model'], 'image-env')
@@ -249,7 +273,7 @@ class GenerateTests(unittest.TestCase):
 
     def test_network_failure_records_no_key(self):
         with patch.dict(os.environ, ENV, clear=True), patch.object(relay, 'call', side_effect=relay.RelayError(ENV['RELAY_IMAGE_API_KEY'])) as call, contextlib.redirect_stderr(io.StringIO()):
-            status = relay.main(['generate', '--prompt', 'cat', '--out', str(self.out)])
+            status = relay.main(['generate', '--confirm-relay', '--prompt', 'cat', '--out', str(self.out)])
         self.assertEqual(status, 1)
         call.assert_called_once()
         self.assertNotIn(ENV['RELAY_IMAGE_API_KEY'], json.dumps(self.report()))
@@ -299,7 +323,7 @@ class GenerateTests(unittest.TestCase):
 
     def test_http_read_failure_is_reported_without_retry(self):
         with patch.dict(os.environ, ENV, clear=True), patch.object(relay, 'call', side_effect=relay.http.client.IncompleteRead(b'', 10)) as call, contextlib.redirect_stderr(io.StringIO()):
-            status = relay.main(['generate', '--prompt', 'cat', '--out', str(self.out)])
+            status = relay.main(['generate', '--confirm-relay', '--prompt', 'cat', '--out', str(self.out)])
         self.assertEqual(status, 1)
         call.assert_called_once()
         self.assertFalse(self.out.exists())

@@ -1,6 +1,6 @@
 # 中转站 Image 图像生成配置器
 
-一个独立的 Codex Skill：**先引导用户在终端配置自己的 API Key 和 API 基础 URL，验证通过后，才能通过中转站生成图片。**
+一个独立的 Codex Skill：**先引导用户在终端配置自己的 API Key 和 API 基础 URL，验证通过且确认本次选择中转后，才能通过中转站生成图片。**
 
 - 路径：`POST {BASE_URL}/responses` + `image_generation` 工具。
 - 主模型与图片模型分别配置；默认 `gpt-5.5` + `gpt-image-2`。
@@ -10,6 +10,23 @@
 - 当前版本支持文字生成单张 PNG，不包含图片编辑、多图批量或透明背景流程。
 
 > 这是第三方中转配置工具，不是 OpenAI 官方产品。只有你信任的中转才能接收你的密钥和提示词。兼容 API 格式并不保证模型身份、账号权限、质量参数或计费与官方完全一致。
+
+## 触发条件：不是“配过 Key 就永远走中转”
+
+| 当前请求/线路 | 行为 |
+| --- | --- |
+| 要求配置中转 | 引导 Key / URL 配置，不自动生图 |
+| 明确要求本次用中转，或可靠确认当前会话使用这个中转 | 检查配置，通过后走此 skill |
+| 普通生图请求，当前为官方账号 | 不接管，交回官方可用生图流程 |
+| 线路未知或刚切换但无法确认 | 不猜测，不发送中转生图请求；必要时询问 |
+
+**安装后的 Key / URL 只是凭据，不是当前线路开关。** 不能根据模型名、旧会话确认、自定义 provider 或 localhost 地址自动判断代理上游。该 skill 不读取账号认证文件，也没有 CC Switch 的实时线路事件。
+
+Skill 描述控制语义匹配，不提供按登录账号启停的硬钩子。CLI 要求每次传 `--confirm-relay`，缺少时停止且不联网；此参数表示调用方已经确认本次选择中转，**不等于脚本检测过账号**。不要把它设成永久默认。完全无感切换需要宿主/切换工具额外提供可信的当前会话线路信号，当前版本尚未集成。
+
+**PNG 为默认且当前唯一输出格式**：请求设置 `output_format: png`，输出使用 `.png`，并验证实际 PNG 数据；不把 JPEG 改后缀伪装成 PNG。其他格式暂不支持。
+
+如果另外安装了带有“所有生图都走中转”规则的旧 skill，请在确认后缩小其触发范围或设为仅显式调用，否则会与分流意图冲突。本工具不会自动修改其他 skill。
 
 ## 1. 安装
 
@@ -99,7 +116,7 @@ python3 scripts/relay_image.py doctor --list-models
 ## 4. 生成第一张图片（可能产生费用）
 
 ```bash
-python3 scripts/relay_image.py generate \
+python3 scripts/relay_image.py generate --confirm-relay \
   --prompt "一只毛茸茸的小橘猫，完整坐姿，写实宠物摄影，柔和自然光，无文字或水印" \
   --out "$PWD/outputs/cat.png"
 ```
@@ -107,7 +124,7 @@ python3 scripts/relay_image.py generate \
 切换主模型，但保留同一个图片工具模型：
 
 ```bash
-python3 scripts/relay_image.py generate \
+python3 scripts/relay_image.py generate --confirm-relay \
   --driver-model gpt-5.6-sol \
   --image-model gpt-image-2 \
   --prompt "一只小猫坐在窗边，柔和自然光" \
@@ -126,7 +143,7 @@ CLI 参数 > 对应环境变量 > 内置默认值。`gpt-5.5`、`gpt-5.6-sol` �
 长提示词可使用 `--prompt-file /absolute/path/prompt.txt`；与 `--prompt` 二选一。仅查看请求：
 
 ```bash
-python3 scripts/relay_image.py generate \
+python3 scripts/relay_image.py generate --confirm-relay \
   --prompt "一只小猫" --out "$PWD/outputs/preview.png" --dry-run
 ```
 
@@ -148,7 +165,7 @@ python3 scripts/relay_image.py generate \
 ## 6. 在 Codex 中调用
 
 ```text
-使用 $relay-image-configurator，先检查终端环境配置，再生成一只小猫。
+这次明确使用中转：用 $relay-image-configurator 检查终端环境配置，再生成一只小猫，输出 PNG。
 ```
 
 如果只是请求“帮我配置”，skill 应停在引导/检查阶段；付费生成测试图需要你的明确要求。
@@ -179,3 +196,5 @@ python3 -m unittest discover -s tests -v
 - [GPT-5.5 模型能力](https://developers.openai.com/api/docs/models/gpt-5.5)
 
 这些链接解释官方 API，不承诺任何第三方中转的实现或账单规则。
+
+触发机制参考：[Codex Skills](https://developers.openai.com/codex/skills)（description 语义匹配及 allow_implicit_invocation）。
