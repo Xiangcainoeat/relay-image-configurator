@@ -1,0 +1,19 @@
+# Credentials and local configuration
+.env
+.env.*
+*.pem
+*.key
+*credentials*.json
+# Generated images, prompts, diagnostics and local runtime
+outputs/
+work/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.log
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.DS_Store
